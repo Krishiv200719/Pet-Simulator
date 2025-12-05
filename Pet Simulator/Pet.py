@@ -1,26 +1,74 @@
-import pickle
+import random
 
 class Pet:
     def __init__(self, name):
         self.name = name
+        
         self.hunger = 50
         self.happiness = 50
         self.energy = 50
         self.health = 50
+        
         self.level = 1
         self.experience = 0
+        
         self.is_dead = False
 
+        self.state = "idle"
+        self.animation_frame = 0
+        self.animation_timer = 0
+        self.action_timer = 0
+
+        self.blink_timer = 0
+        self.blink_delay = random.randint(60, 200)
+
+    def update_animation(self, animation_length, idle_animation_length):
+        if self.is_dead:
+            return
+        
+        self.animation_timer += 1
+        
+        if self.state == "idle":
+            if self.animation_timer >= 12:
+                self.animation_timer = 0
+                self.animation_frame = (self.animation_frame + 1) % idle_animation_length
+            
+            self.blink_timer += 1
+            if self.blink_timer > self.blink_delay:
+                self.animation_frame = 1
+                if self.blink_timer > self.blink_delay + 10:
+                    self.blink_timer = 0
+                    self.blink_delay = random.randint(60, 200)
+        
+        else:
+            if self.animation_timer >= 7:
+                self.animation_timer = 0
+                self.animation_frame += 1
+                if self.animation_frame >= animation_length:
+                    self.animation_frame = 0
+            
+            self.action_timer -= 1
+            if self.action_timer <= 0:
+                self.state = "idle"
+
+    def start_action(self, state, duration):
+        if not self.is_dead:
+            self.state = state
+            self.animation_frame = 0
+            self.animation_timer = 0
+            self.action_timer = duration
+
     def feed(self):
-        print(f"{self.name} is eating...")
+        self.start_action("eat", 25)
         self.hunger -= 20
         self.health += 5
+        self.energy += 10
         self.happiness += 5
         self.gain_xp(10)
         self.update_stats()
 
     def play(self):
-        print(f"{self.name} loves playing!")
+        self.start_action("play", 40)
         self.happiness += 20
         self.energy -= 20
         self.hunger += 10
@@ -28,7 +76,7 @@ class Pet:
         self.update_stats()
 
     def sleep(self):
-        print(f"{self.name} is sleeping...zzz")
+        self.start_action("sleep", 50)
         self.energy += 25
         self.health += 10
         self.hunger += 5
@@ -36,7 +84,7 @@ class Pet:
         self.update_stats()
 
     def wash(self):
-        print(f"You are cleaning {self.name}...")
+        self.start_action("wash", 30)
         self.health += 15
         self.happiness -= 5
         self.energy -= 5
@@ -49,48 +97,22 @@ class Pet:
         if self.experience >= 50:
             self.level += 1
             self.experience = 0
-            print(f"Congratulations! {self.name} reached Level {self.level}!")
 
     def update_stats(self):
         if self.energy <= 20:
             self.happiness -= 10
-            print(f"{self.name} feels tired and unhappy.")
 
         if self.hunger >= 80:
             self.happiness -= 10
-            print(f"{self.name} is feeling very hungry.")
 
         if self.hunger >= 100:
-            print(f"\nALERT: {self.name} is starving and suffering!")
             self.health -= 10
 
         if self.hunger <= 0:
-            print(f"\nALERT: {self.name} is overfed and feeling sick!")
             self.health -= 10
 
-        stats = ['hunger', 'happiness', 'energy', 'health']
-        for attr in stats:
-            value = getattr(self, attr)
-            setattr(self, attr, max(0, min(100, value)))
-
-        if self.energy == 0:
-            print(f"\n{self.name} collapsed from exhaustion!")
+        for attr in ['hunger', 'happiness', 'energy', 'health']:
+            setattr(self, attr, max(0, min(100, getattr(self, attr))))
 
         if self.health == 0:
-            print(f"\nCRITICAL ALERT: {self.name} has died...")
             self.is_dead = True
-
-    def show_status(self):
-        print("\n===== Pet Status =====")
-        print(f"Name: {self.name}")
-        print(f"Hunger: {self.hunger}")
-        print(f"Happiness: {self.happiness}")
-        print(f"Energy: {self.energy}")
-        print(f"Health: {self.health}")
-        print(f"Level: {self.level}")
-        print("=======================\n")
-
-    def save(self):
-        with open("/Users/krishiv/Documents/Python/Pet Simulator/savegame.dat", "wb") as file:
-            pickle.dump(self, file)
-        print("Game Saved.")

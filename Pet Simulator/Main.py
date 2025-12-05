@@ -1,7 +1,7 @@
-import pygame
-import pickle
-import os
 from Pet import Pet
+import pickle
+import pygame
+import os
 import random
 import math
 
@@ -11,23 +11,25 @@ screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption("Pet Simulator")
 font = pygame.font.Font(None, 28)
 
-save_path = "/Users/krishiv/Documents/Python/Pet Simulator/savegame.dat"
+BASE_PATH = os.path.dirname(__file__)
+save_path = os.path.join(BASE_PATH, "savegame.dat")
 
 clouds_moving = True
+pet_animating = True
 
-pet_image = pygame.image.load("/Users/krishiv/Documents/Python/Pet Simulator/assets/pet.png")
-pet_image = pygame.transform.scale(pet_image, (140, 140))
+def load_image(path):
+    return pygame.image.load(os.path.join(BASE_PATH, path)).convert_alpha()
 
-ghost_image = pygame.image.load("/Users/krishiv/Documents/Python/Pet Simulator/assets/Ghost.png")
+ghost_image = load_image("assets/Ghost.png")
 ghost_image = pygame.transform.scale(ghost_image, (140, 140))
 
-background_image = pygame.image.load("/Users/krishiv/Documents/Python/Pet Simulator/assets/background.png")
+background_image = load_image("assets/background.png")
 background_image = pygame.transform.scale(background_image, (650, 350))
 
 cloud_images = [
-    pygame.image.load("/Users/krishiv/Documents/Python/Pet Simulator/assets/cloud1.webp"),
-    pygame.image.load("/Users/krishiv/Documents/Python/Pet Simulator/assets/cloud2.webp"),
-    pygame.image.load("/Users/krishiv/Documents/Python/Pet Simulator/assets/cloud3.png")
+    load_image("assets/cloud1.webp"),
+    load_image("assets/cloud2.webp"),
+    load_image("assets/cloud3.png")
 ]
 cloud_images = [pygame.transform.scale(img, (100, 60)) for img in cloud_images]
 
@@ -37,7 +39,36 @@ cloud_start_positions = [
     (500, 20)
 ]
 
-import math
+animations = {
+    "idle": [
+        load_image("assets/pet/idle1.png"),
+        load_image("assets/pet/idle2.png"),
+        load_image("assets/pet/idle3.png")
+    ],
+    "eat": [
+        load_image("assets/pet/eat1.png"),
+        load_image("assets/pet/eat2.png")
+    ],
+    "play": [
+        load_image("assets/pet/play1.png"),
+        load_image("assets/pet/play2.png"),
+        load_image("assets/pet/play3.png")
+    ],
+    "sleep": [
+        load_image("assets/pet/sleep1.png"),
+        load_image("assets/pet/sleep2.png")
+    ],
+    "wash": [
+        load_image("assets/pet/wash1.png"),
+        load_image("assets/pet/wash2.png"),
+        load_image("assets/pet/wash3.png")
+    ]
+}
+
+for key in animations:
+    animations[key] = [
+        pygame.transform.scale(img, (140, 140)) for img in animations[key]
+    ]
 
 class Cloud:
     def __init__(self, image, start_x, start_y, depth):
@@ -46,7 +77,7 @@ class Cloud:
         self.base_y = start_y
         self.y = start_y
 
-        self.depth = depth  
+        self.depth = depth
         self.speed = 1.5 / depth
         transparency_value = max(60, 255 - depth * 60)
         self.image.set_alpha(transparency_value)
@@ -58,7 +89,7 @@ class Cloud:
     def move(self):
         self.x -= self.speed
         if self.x < -150:
-            self.x = 700  
+            self.x = 700
 
         self.drift_angle += self.drift_speed
         self.y = self.base_y + math.sin(self.drift_angle) * self.drift_range
@@ -99,7 +130,15 @@ def load_pet():
     try:
         with open(save_path, "rb") as f:
             print("Loaded saved pet.")
-            return pickle.load(f)
+            pet_obj = pickle.load(f)
+            pet_obj.state = "idle"
+            pet_obj.animation_frame = 0
+            pet_obj.animation_timer = 0
+            pet_obj.action_timer = 0
+            pet_obj.blink_timer = 0
+            pet_obj.blink_delay = random.randint(60, 200)
+
+            return pet_obj
     except:
         print("No save found. Starting new pet.")
         return None
@@ -135,10 +174,6 @@ def draw_bar(label, value, x, y, color):
     bar_width = int((value / 100) * 200)
     pygame.draw.rect(screen, color, (x, y + 22, bar_width, 20))
 
-def draw_pet():
-    image = ghost_image if pet.is_dead else pet_image
-    screen.blit(image, (350, 160))
-
 def draw_stats():
     draw_bar("Hunger", pet.hunger, 20, 20, (255, 100, 100))
     draw_bar("Happiness", pet.happiness, 20, 80, (100, 200, 255))
@@ -147,17 +182,42 @@ def draw_stats():
     level_text = font.render(f"Level: {pet.level}", True, (255, 180, 50))
     screen.blit(level_text, (20, 260))
 
+def draw_pet():
+    if pet.is_dead:
+        float_offset = math.sin(pygame.time.get_ticks() * 0.005) * 6
+        screen.blit(ghost_image, (350, 160 + float_offset))
+        return
+
+    if pet_animating:
+        current_anim_len = len(animations[pet.state])
+        idle_len = len(animations["idle"])
+        pet.update_animation(current_anim_len, idle_len)
+
+    frame = animations[pet.state][pet.animation_frame]
+
+    offset_y = 0
+    if pet.state == "play":
+        offset_y = math.sin(pet.animation_frame * 1.5) * 6
+    elif pet.state == "sleep":
+        offset_y = math.sin(pet.animation_frame * 0.5) * 3
+    elif pet.state == "wash":
+        offset_y = random.randint(-3, 3)
+
+    screen.blit(frame, (350, 160 + offset_y))
+
 def restart():
-    global pet, clouds_moving
+    global pet, clouds_moving, pet_animating
     clouds_moving = True
+    pet_animating = True
     if os.path.exists(save_path):
         os.remove(save_path)
     name = text_input("Enter pet name:")
     pet = Pet(name)
 
 def game_over_screen():
-    global clouds_moving
+    global clouds_moving, pet_animating
     clouds_moving = False
+    pet_animating = False
 
     if os.path.exists(save_path):
         os.remove(save_path)
@@ -171,7 +231,9 @@ def game_over_screen():
         for cloud in clouds:
             cloud.draw()
 
+        draw_stats()
         draw_pet()
+
         msg = font.render(f"{pet.name} has died...", True, (255, 50, 50))
         msg2 = font.render("Game Over!", True, (255, 255, 255))
         screen.blit(msg, (225, 180))
@@ -190,8 +252,9 @@ def game_over_screen():
                 b.check_click(event)
 
 def quit_popup():
-    global clouds_moving
+    global clouds_moving, pet_animating
     clouds_moving = False
+    pet_animating = False
     popup_running = True
 
     def save_and_quit():
@@ -207,6 +270,7 @@ def quit_popup():
         nonlocal popup_running
         popup_running = False
         globals()["clouds_moving"] = True
+        globals()["pet_animating"] = True
 
     btn_save = Button("Save & Quit", 120, 280, 140, 40, save_and_quit)
     btn_quit = Button("Quit", 300, 280, 100, 40, quit_without_saving)
