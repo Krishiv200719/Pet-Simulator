@@ -206,13 +206,27 @@ def draw_pet():
     screen.blit(frame, (350, 160 + offset_y))
 
 def restart():
-    global pet, clouds_moving, pet_animating
+    global pet, clouds_moving, pet_animating, buttons
     clouds_moving = True
     pet_animating = True
     if os.path.exists(save_path):
         os.remove(save_path)
     name = text_input("Enter pet name:")
     pet = Pet(name)
+
+    pet.state = "idle"
+    pet.animation_frame = 0
+    pet.animation_timer = 0
+    pet.action_timer = 0
+
+    buttons = [
+        Button("Feed", 80, 350, 100, 40, pet.feed),
+        Button("Play", 190, 350, 100, 40, pet.play),
+        Button("Sleep", 360, 350, 100, 40, pet.sleep),
+        Button("Wash", 470, 350, 100, 40, pet.wash),
+        Button("Save", 10, 400, 60, 40, lambda: save_pet(pet)),
+        Button("Exit", 580, 400, 60, 40, quit_popup)
+    ]
 
 def game_over_screen():
     global clouds_moving, pet_animating
